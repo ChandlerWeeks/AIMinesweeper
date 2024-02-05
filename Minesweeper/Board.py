@@ -1,5 +1,10 @@
 import pygame
 import random
+import time
+import math
+
+def get_font(size): # Returns Press-Start-2P in the desired size
+    return pygame.font.Font("assets/digital-7.ttf", size)
 
 class Board:
   def __init__(self, x, y, density):
@@ -11,6 +16,10 @@ class Board:
     self.startingY = int(((720) / 2) - (self.y * 32 / 2))
     self.clicked=0
     self.state = 0
+    self.remainingMines = 0
+
+    self.timer_started = False
+    self.elapsedTime = 0
 
     # initialize an empty board
     for curX in range(x):
@@ -23,6 +32,23 @@ class Board:
     for row in self.cells:
       for cell in row:
         cell.clicked=True
+
+  
+  def show_remaining_mines(self, screen):
+    REMAINING_MINES_TEXT = get_font(48).render(str(self.remainingMines), True, "Red")
+    REMAINING_MINES_TEXT_RECT = REMAINING_MINES_TEXT.get_rect(center=((self.startingX + 50, self.startingY - 32)))
+    rect_surface = pygame.Surface((80, 50))
+    rect_surface.fill("black")
+    screen.blit(rect_surface, ((self.startingX + 10, self.startingY - 58)))
+    screen.blit(REMAINING_MINES_TEXT, REMAINING_MINES_TEXT_RECT)
+
+  def show_elapsed_time(self, screen):
+    TIME_TEXT = get_font(48).render(str(self.elapsedTime), True, "Red")
+    TIME_TEXT_RECT = TIME_TEXT.get_rect(center=((self.startingX + (32 * self.x) - 50, self.startingY - 32)))
+    rect_surface = pygame.Surface((80, 50))
+    rect_surface.fill("black")
+    screen.blit(rect_surface, ((self.startingX + (32 * self.x) - 90, self.startingY - 58)))
+    screen.blit(TIME_TEXT, TIME_TEXT_RECT)
 
 
   def checkState(self):
@@ -64,6 +90,10 @@ class Board:
   # display a grid of x * y cells, each taking 32 pixels
   def draw_grid(self, screen, sprites):
     size = 32  # Size of each sprite
+    if self.timer_started and self.state == 0:
+      self.elapsedTime = min(int(time.time() - self.start_time), 999)
+    self.show_remaining_mines(screen)
+    self.show_elapsed_time(screen)
     pygame.draw.rect(screen, (100, 100, 100),
                      ((self.startingX - 5, self.startingY - 5), (self.x * 32 + 10, self.y * 32 + 10))
     )
@@ -101,6 +131,8 @@ class Board:
 
   # place the mines on the board, anywhere but where first clicked
   def place_mines(self, initialCell):
+    self.timer_started = True
+    self.start_time=time.time()
     numberOfMines = round(self.x * self.y * (self.density / 100))
     i=0
     while i<numberOfMines:
@@ -111,6 +143,7 @@ class Board:
       self.getCell(x, y).setMine()
       self.addToSiblings(self.getCell(x, y))
       i+=1
+    self.remainingMines=numberOfMines
 
   
   def fillAdjacentEmptyCells(self, initialCell):
@@ -149,8 +182,12 @@ class Cell:
   def handleRightClick(self, board):
     if self.flagged:
       self.flagged = False
+      board.remainingMines+=1
     else:
       self.flagged = True
+      board.remainingMines-=1
+      if board.remainingMines==0:
+        board.checkState()
     
   def addOne(self):
     if self.value == -1:
@@ -172,5 +209,3 @@ class Cell:
     # Two cells are adjacent if their absolute differences in coordinates
     # are at most 1 in both directions (orthogonal or diagonal)
     return dx <= 1 and dy <= 1 and (dx != 0 or dy != 0)
-
-
