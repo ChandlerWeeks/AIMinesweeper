@@ -25,8 +25,10 @@ def get_font(size): # Returns Press-Start-2P in the desired size
 
 # GUI for the main menu
 def main_menu():
+  SCREEN.fill("White")
   response = Menu.menu_loop(SCREEN_WIDTH, SCREEN_HEIGHT, manager, SCREEN)
   play(response[0], response[1], response[2])
+  return
 
 def play(length, width, density):
   board = Board(length, width, density)
