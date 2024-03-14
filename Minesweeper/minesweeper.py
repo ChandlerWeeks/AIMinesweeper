@@ -42,9 +42,7 @@ def play(length, width, density):
   while True:
     clock.tick(FRAME_RATE)
     if ai_mode:
-      print('starting ai mode')
       ai.initialize()
-      print('running ai mode')
       while True:
         for event in pygame.event.get():
           if event.type == pygame.QUIT:

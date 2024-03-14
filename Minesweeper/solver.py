@@ -16,6 +16,8 @@ class Solver:
     self.edgeCells = deque()
     self.screen = screen
     self.pygame = pygame
+    self.source = (board.x // 2, board.y // 2)
+    self.visited = set()
 
   def checkFinished(self, cell):
     adj_cells = self.board.getAdjacentCells(cell)
@@ -39,7 +41,10 @@ class Solver:
           adj_cell.handleLeftClick(self.board)
     if self.checkFinished(cell):
       self.FinishedCells.add(cell)
-    time.sleep(0.01)
+    #else:
+      #self.edgeCells.append(cell)
+      #self.dfs(cell)
+    #time.sleep(0.01)
 
 
   # rule two, we know if all unopened cells around an existing cell are mines IF the cell has the ammount of unopened cells as the # it has
@@ -55,7 +60,7 @@ class Solver:
           adj_cell.handleRightClick(self.board)
     if self.checkFinished(cell):
       self.FinishedCells.add(cell)
-    time.sleep(0.01)
+    #time.sleep(0.01)
 
   """# after making the first guess, start getting cells
   def checkGuarenteedAdjacent(self):
@@ -73,15 +78,13 @@ class Solver:
           """
 
   def checkNextCell(self):
-    for i in range(20):
-      if self.edgeCells:
-        tuple = self.edgeCells.popleft()
-        cell = self.board.getCell(tuple[0], tuple[1])
-        self.makeSafeFlag(cell)
-        self.makeSafeMove(cell)
-        self.checkFinished(cell)
-      else:
-        self.getEdgeCells()
+    if self.edgeCells:
+      cell = self.edgeCells.popleft()
+      self.makeSafeFlag(cell)
+      self.makeSafeMove(cell)
+      self.checkFinished(cell)
+    else:
+      self.getEdgeCells()
 
   def initialize(self):
     if self.pygame:
@@ -89,6 +92,7 @@ class Solver:
       display_thread.start()
     time.sleep(1)  # pause for 0.1 seconds
     self.makeFirstMove()
+    #self.getEdgeCells()
 
   # i chose to start in the middle, many recommend starting in a corner however, to minimize 50/50's
   def makeFirstMove(self):
@@ -109,20 +113,35 @@ class Solver:
       print("\n")
     print("done")
 
+  def isEdgeCell(self, cell):
+    adj_cells = self.board.getAdjacentCells(cell)
+    for adj_cell in adj_cells:
+        if not adj_cell.clicked:
+            return True
+    return False
+
   # get cells on the edge of the board, and mark cells that no longer need checking
-  #TODO: SPEED THIS SHIT UP
+  #TODO: USE bfs
   def getEdgeCells(self):
-    for row in self.board.cells:
-      for cell in row:
-        if cell.clicked and cell not in self.FinishedCells:
-          if cell.value == 0:
-            self.FinishedCells.add(cell)
-          adj_cells = self.board.getAdjacentCells(cell)
-          for adj_cell in adj_cells:
-            if adj_cell.clicked:
-              self.edgeCells.append((cell.location[0], cell.location[1]))
-              break
+    self.edgeCells.clear()  # Clear the list of edge cells
+    cell = self.board.getCell(self.source[0], self.source[1])
+    self.visited.clear()
+    self.bfs(cell)
 
+  def bfs(self, cell):
+    queue = deque([cell])
+    while queue:
+      cell = queue.popleft()
+      if cell in self.visited:
+        continue
+      self.visited.add(cell)
+      if cell.clicked and cell.value == 0:
+        self.FinishedCells.add(cell)
+      if cell.clicked and cell not in self.FinishedCells:
+        self.edgeCells.append(cell)
+      for adj_cell in self.board.getAdjacentCells(cell):
+        if adj_cell.clicked and adj_cell not in self.visited:
+          queue.append(adj_cell)
 
-
-  
+  def addNewKnowledge():
+    return
