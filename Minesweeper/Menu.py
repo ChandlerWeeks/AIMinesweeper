@@ -21,12 +21,12 @@ def menu_loop(SCREEN_WIDTH, SCREEN_HEIGHT, manager, SCREEN, FRAME_RATE=60):
   HORIZONTAL_SLIDER = pygame_gui.elements.UIHorizontalSlider(
     relative_rect=pygame.Rect((SCREEN_WIDTH/2 - 175, SCREEN_HEIGHT/2 - 50), (400, 30)),
     start_value=10,
-    value_range=(8, 24)
+    value_range=(8, 30)
   )
   VERTICAL_SLIDER = pygame_gui.elements.UIHorizontalSlider(
     relative_rect=pygame.Rect((SCREEN_WIDTH/2 - 175, SCREEN_HEIGHT/2), (400, 30)),
     start_value=10,
-    value_range=(8, 16)
+    value_range=(8, 18)
   )
   MINES_DENSITY_SLIDER = pygame_gui.elements.UIHorizontalSlider(
     relative_rect=pygame.Rect((SCREEN_WIDTH/2 - 175, SCREEN_HEIGHT/2 + 50), (400, 30)),

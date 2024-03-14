@@ -22,6 +22,7 @@ class Board:
     
     self.state = 0 # game's state (lose, playing, win)
     self.remainingMines = 0 
+    self.totalMines=0
 
     # variables for measuring time
     self.timer_started = False
@@ -60,20 +61,17 @@ class Board:
 
   # check if the game is over
   def checkState(self):
-    empty=0
+    unflaggedMines = self.totalMines
     for row in self.cells:
       for cell in row:
         if cell.value == -1 and cell.clicked:
           self.state = -1
           self.revealBoard()
           return
-        elif cell.clicked:
-          continue
-        #TODO: fix this logic, a game isnt complete if all cells are clicked
-        else: 
-          empty+=1
-    if empty > 0:
-      state = 1
+        if cell.flagged and cell.value == -1:
+          unflaggedMines-=1
+    if unflaggedMines == 0:
+      self.state = 1
 
   # get a cell with a x and y coordinate
   def getCell(self, x, y):
@@ -166,8 +164,9 @@ class Board:
       self.addToSiblings(self.getCell(x, y))
       i+=1 # increment loop
     self.remainingMines=numberOfMines
+    self.totalMines=numberOfMines
 
-  # fill empty cells (status=0) adjacent to a clicked empty cell, 
+  # fill empty cells (status=0) adjacent to a clickeFd empty cell, 
   # along with the border or cells with adjacent mines
   def fillAdjacentEmptyCells(self, initialCell):
     adjacentCells=self.getAdjacentCells(initialCell)

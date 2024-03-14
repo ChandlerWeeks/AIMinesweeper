@@ -4,6 +4,7 @@ import sys
 from Board import Board
 import Menu
 import time
+from solver import Solver
 
 pygame.init()
 
@@ -32,40 +33,56 @@ def main_menu():
 
 def play(length, width, density):
   board = Board(length, width, density)
+  ai = Solver(board, SCREEN, pygame)
+  ai_mode = True
   SCREEN.fill("White")
   pygame.display.set_caption("Minesweeper")
   SCREEN.blit(BG, (0, 0))
   board.draw_board(SCREEN)
   while True:
     clock.tick(FRAME_RATE)
-    for event in pygame.event.get():
-      if event.type == pygame.QUIT:
-        pygame.quit()
-        sys.exit()
-      if board.state != -1 or board.state != 1:
-        if event.type == pygame.MOUSEBUTTONDOWN:
-          if event.button == 1:
-            try:
-              xClicked, yClicked = event.pos
-              col = (xClicked - board.startingX) // 32
-              row = (yClicked - board.startingY) // 32
-              board.getCell(col, row).handleLeftClick(board)
-              SCREEN.blit(BG, (0, 0))
-            except IndexError:
-              continue
-          elif event.button == 3:
-            try:
-              xClicked, yClicked = event.pos
-              col = (xClicked - board.startingX) // 32
-              row = (yClicked - board.startingY) // 32
-              board.getCell(col, row).handleRightClick(board)
-              SCREEN.blit(BG, (0, 0))
-            except IndexError:
-              continue
+    if ai_mode:
+      print('starting ai mode')
+      ai.initialize()
+      print('running ai mode')
+      while True:
+        for event in pygame.event.get():
+          if event.type == pygame.QUIT:
+            pygame.quit()
+            sys.exit()
+          if board.state == 0:
+            ai.checkNextCell()
+          else:
+            board.draw_board(SCREEN)
+            pygame.display.update()
+    else:
+      for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+          pygame.quit()
+          sys.exit()
+        if board.state == 0:
+          if event.type == pygame.MOUSEBUTTONDOWN:
+            if event.button == 1:
+              try:
+                xClicked, yClicked = event.pos
+                col = (xClicked - board.startingX) // 32
+                row = (yClicked - board.startingY) // 32
+                board.getCell(col, row).handleLeftClick(board)
+                SCREEN.blit(BG, (0, 0))
+              except IndexError:
+                continue
+            elif event.button == 3:
+              try:
+                xClicked, yClicked = event.pos
+                col = (xClicked - board.startingX) // 32
+                row = (yClicked - board.startingY) // 32
+                board.getCell(col, row).handleRightClick(board)
+                SCREEN.blit(BG, (0, 0))
+              except IndexError:
+                continue
+
 
     board.draw_board(SCREEN)
-
-
     pygame.display.update()
 
   def gameOver(msg):

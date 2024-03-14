@@ -29,6 +29,8 @@ class Cell:
   
   # handle a cell being clicked
   def handleRightClick(self, board):
+    if self.clicked:
+      return
     board.clicked += 1 # note that a cell has been clicked
 
     # unflag a cell
