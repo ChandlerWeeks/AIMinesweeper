@@ -2,7 +2,7 @@ from Board import Board
 from solver import Solver
 import time
 
-board = Board(50, 50, 10.0)
+board = Board(30, 30, 10.0)
 ai = Solver(board, None, None)
 
 ai.initialize()
