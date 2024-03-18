@@ -2,13 +2,16 @@ import time
 import threading
 import sys
 from collections import deque
+import random
+import math
+import itertools
 
 # function to update the screen every 1/10th a second
 def update_display(board, screen, pygame):
   while board.state == 0:
     board.draw_board(screen)
     pygame.display.update()
-    time.sleep(0.1)
+    #time.sleep(0.1)
 
 class Solver:
   def __init__(self, board, screen, pygame):
@@ -16,30 +19,56 @@ class Solver:
 
     # used in BFS and determining next cell to check for mines/clear around
     self.FinishedCells = set()
-    self.edgeCells = []
+    self.edgeCells = deque()
 
     # objects to update screen
     self.screen = screen
     self.pygame = pygame
     self.source = (board.x // 2, board.y // 2) # first node clicked for original BFS
-    self.visited = set() # set of visited cells
+    self.visited = set()
 
     # values for the probability of a cell being a mine
     self.hundredQueue = deque()
     self.zeroQueue = deque()
     self.probabilities = [[-1 for i in range(board.y)] for j in range(board.x)] # create a 2D array of probabilities initialized to -1
-    self.sleepMode = True # create a 2D array of probabilities initialized to 0
+    self.sleepMode = True
 
   # check if an edge cell no longer needs checking for the states of adjacent cells
   def checkFinished(self, cell):
-    unopened = self.countAdjacentUnopened(cell)
-    flags = self.countAdjacentFlags(cell)
-    if unopened != flags:
-      return False
-    
+    adj_cells = self.board.getAdjacentCells(cell)
+    for adj_cell in adj_cells:
+      if not adj_cell.clicked or not adj_cell.flagged:
+        return False
+    self.FinishedCells.add(cell)
     return True
   
-  #TODO: finsih this function, implement into project
+
+  def calculateFlags(self, cell):
+    unopened = self.countAdjacentUnopened(cell)
+    flags = self.countAdjacentFlags(cell)
+    adj_cells = self.board.getAdjacentCells(cell)
+    if unopened == 0 and cell.flags == flags:
+      self.FinishedCells.add(cell)
+      return
+    if unopened == cell.value - flags and flags != cell.value:
+      for adj_cell in adj_cells:
+        if not adj_cell.clicked and adj_cell not in self.hundredQueue:
+          self.probabilities[adj_cell.location[0]][adj_cell.location[1]] = 100
+          self.hundredQueue.append(adj_cell)
+
+  def calculateClicks(self, cell):
+    flags = self.countAdjacentFlags(cell)
+    unopened = self.countAdjacentUnopened(cell)
+    adj_cells = self.board.getAdjacentCells(cell)
+    if unopened == 0 and cell.flags == flags:
+      self.FinishedCells.add(cell)
+      return
+    if cell.value == flags:
+      for adj_cell in adj_cells:
+        if not adj_cell.flagged and adj_cell not in self.zeroQueue and not adj_cell.clicked:
+          self.probabilities[adj_cell.location[0]][adj_cell.location[1]] = 0
+          self.zeroQueue.append(adj_cell)
+
   def calculateAdjacentProbabilities(self, cell):
     flags = self.countAdjacentFlags(cell)
     unopened = self.countAdjacentUnopened(cell)
@@ -47,16 +76,15 @@ class Solver:
     clicked = self.countClicked(cell)
     if cell.value == flags:
       for adj_cell in adj_cells:
-        if not adj_cell.clicked and adj_cell not in self.zeroQueue and not adj_cell.flagged:
+        if not adj_cell.flagged and adj_cell not in self.zeroQueue:
           self.probabilities[adj_cell.location[0]][adj_cell.location[1]] = 0
           self.zeroQueue.append(adj_cell)
-      if self.checkFinished(cell):
-        self.FinishedCells.add(cell)
-    elif clicked == len(adj_cells) - cell.value:
+    if clicked == cell.value - flags and flags != cell.value:
       for adj_cell in adj_cells:
-        if not adj_cell.clicked and adj_cell not in self.hundredQueue and not adj_cell.flagged:
+        if not adj_cell.clicked and adj_cell not in self.hundredQueue:
           self.probabilities[adj_cell.location[0]][adj_cell.location[1]] = 100
           self.hundredQueue.append(adj_cell)
+
 
   # count flags around a cell
   def countAdjacentFlags(self, cell):
@@ -84,61 +112,96 @@ class Solver:
         count+=1
     return count
 
+  # Make safe open move
   def makeSafeOpen(self):
-      # Make safe open move
     if len(self.zeroQueue) != 0:
       cell = self.zeroQueue.popleft()
-      cell.handleLeftClick(self.board)
       self.addNewKnowledge(cell)
+      cell.handleLeftClick(self.board)
+      if self.board.state != 0:
+        return
       if self.sleepMode:
-        time.sleep(0.01)
+        time.sleep(0.1)
     # issue, WE HAVE TO GUESS
     # lets click the cell with the lowest odds of being a mine
+    elif len(self.hundredQueue) == 0:
+      print('guess time')
+      min_probability_cell = self.getCellWithLowestProbability()
+      if min_probability_cell is None:
+        if self.board.state == 0:
+          print("something catastrophic happened, no cells to click, exiting...")
+          sys.exit()
+        else:
+          return
+      else:
+        min_probability_cell.handleLeftClick(self.board)
+        self.addNewKnowledge(min_probability_cell)
+        if self.sleepMode:
+          time.sleep(0.1)
     """
-    else:
-      min_probability = float('inf')
-      min_probability_cell = None
-      for cell in self.edgeCells:
-        probability = self.probabilities[cell.location[0]][cell.location[1]]
-        min_probability = min(min_probability, probability)
-        if min_probability == probability:
-          min_probability_cell = cell
-      min_probability_cell.handleLeftClick(self.board)
-      self.checkFinished(min_probability_cell)
-      self.addNewKnowledge(min_probability_cell)
-      #time.sleep(0.01)
+      while True:
+        #print(len(self.computeAllConfigurations()))
+        i = random.randint(0, self.board.x - 1)
+        j = random.randint(0, self.board.y - 1)
+        random_cell = self.board.getCell(i, j)
+        if not random_cell.clicked and not random_cell.flagged:
+          random_cell.handleLeftClick(self.board)
+          if self.checkFinished(random_cell):
+            self.FinishedCells.add(random_cell)
+          self.addNewKnowledge(random_cell)
+          if self.sleepMode:
+            time.sleep(0.1)
+        return
     """
 
   # update version of make safe flag that accounts for the probability queue
   def makeSafeFlag(self):
     if len(self.hundredQueue) != 0:
       cell = self.hundredQueue.popleft()
-      if not cell.flagged:
-        cell.handleRightClick(self.board)
+      cell.handleRightClick(self.board)
       if self.sleepMode:
-        time.sleep(0.01)
-      #time.sleep(0.01)
+        time.sleep(0.1)
+
+  def printEdgeCells(self):
+    for cell in self.edgeCells:
+      print(cell.location)
+    print("\n")
+
 
   # calulates available probabilities if no zeroes, if there are still none make the most likely to succeed move
   def checkNextCell(self):
-    updated_edge_cells = []
-    for cell in self.edgeCells:
-      self.calculateAdjacentProbabilities(cell)
-      if self.checkFinished(cell):
-        self.FinishedCells.add(cell)
-        self.edgeCells.remove(cell)
-
-    self.makeSafeFlag()
-    self.makeSafeOpen()
+    for i in range(len(self.edgeCells)):
+      cell = self.edgeCells.popleft()
+      if(self.checkFinished(cell)):
+        self.edgeCells.append(cell)
+        continue
+      self.calculateFlags(cell)
+    while len(self.hundredQueue) != 0:
+      self.makeSafeFlag()
+    for i in range(len(self.edgeCells)):
+      cell = self.edgeCells.popleft()
+      if(self.checkFinished(cell)):
+        self.edgeCells.append(cell)
+        continue
+      self.calculateClicks(cell)
+    if len(self.zeroQueue) == 0:
+      print('no guaranteed moves')
+      self.makeSafeOpen()
+    else: 
+      while len(self.zeroQueue) != 0:
+        self.makeSafeOpen()
+    
 
   # initialize the playing of the game by the AI
   def initialize(self):
     if self.pygame:
       display_thread = threading.Thread(target=update_display, args=(self.board, self.screen, self.pygame), daemon=True)
       display_thread.start()
-    time.sleep(1)
+    if self.sleepMode:
+      time.sleep(1)  # pause for 0.1 seconds
     self.makeFirstMove()
-    time.sleep(1)
+    if self.sleepMode:
+      time.sleep(1)
     self.getEdgeCells()
 
   # i chose to start in the middle, many recommend starting in a corner however, to minimize 50/50's
@@ -164,8 +227,8 @@ class Solver:
   def isEdgeCell(self, cell):
     adj_cells = self.board.getAdjacentCells(cell)
     for adj_cell in adj_cells:
-      if not adj_cell.clicked:
-        return True
+        if not adj_cell.clicked:
+            return True
     return False
 
   # get cells on the edge of the board, and mark cells that no longer need checking
@@ -206,6 +269,75 @@ class Solver:
       for adj_cell in self.board.getAdjacentCells(cell):
         if adj_cell.clicked and adj_cell not in self.visited:
           queue.append(adj_cell)
+
+  def getEdgeUnopened(self):
+    unopened = []
+    for cell in self.edgeCells:
+      adj_cells = self.board.getAdjacentCells(cell)
+      for adj_cell in adj_cells:
+        if not adj_cell.clicked and not adj_cell.flagged:
+          unopened.append(adj_cell)
+    return unopened
+
+  def computeAllConfigurations(self):
+    unopened_cells = self.getEdgeUnopened()
+    num_unopened = len(unopened_cells)
+    remaining_mines = self.board.remainingMines
+    configurations = []
+
+    for num_mines in range(remaining_mines + 1):
+      for configuration in itertools.combinations(unopened_cells, num_mines):
+        configurations.append(set(configuration))
+
+    return configurations
+  
+  def countFlaggedConfigurations(self, target_cell):
+    all_configurations = self.computeAllConfigurations()
+    count = 0
+
+    for configuration in all_configurations:
+      if target_cell in configuration and self.isValidConfiguration(configuration):
+        count += 1
+
+    return count
+
+  def isValidConfiguration(self, configuration):
+    for cell in configuration:
+      if not self.isValidCell(cell):
+        return False
+    return True
+
+  def isValidCell(self, cell):
+    # Check if the number of flags around the cell equals the value of the cell
+    return self.countAdjacentFlags(cell) == cell.value
+
+  def calculateEdgeProbabilities(self):
+    all_configurations = self.computeAllConfigurations()
+    num_configurations = len(all_configurations)
+    unopened_cells = self.getEdgeUnopened()
+
+    for cell in unopened_cells:
+      flagged_configurations = 0
+      for configuration in all_configurations:
+        if cell in configuration:
+          flagged_configurations += 1
+      self.probabilities[cell.location[0]][cell.location[1]] = flagged_configurations / num_configurations * 100
+
+
+  def getCellWithLowestProbability(self):
+    if self.board.state != 0:
+      return
+    min_probability = float('inf')
+    min_probability_cell = None
+    edge_cells = self.getEdgeUnopened()
+    for cell in edge_cells:
+      i, j = cell.location
+      probability = self.probabilities[i][j]
+      if not cell.clicked and not cell.flagged and probability < min_probability:
+        min_probability = probability
+        min_probability_cell = cell
+    return min_probability_cell
+  
 
   # deperecated funcitons
   """

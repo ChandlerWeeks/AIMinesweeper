@@ -9,6 +9,7 @@ ai.initialize()
 
 while ai.board.state == 0:
   ai.checkNextCell()
+  print(ai.board.state)
   if ai.board.state != 0:
     break
 

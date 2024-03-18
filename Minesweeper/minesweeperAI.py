@@ -33,41 +33,25 @@ def main_menu():
 
 def play(length, width, density):
   board = Board(length, width, density)
+  ai = Solver(board, SCREEN, pygame)
   SCREEN.fill("White")
   pygame.display.set_caption("Minesweeper")
   SCREEN.blit(BG, (0, 0))
   board.draw_board(SCREEN)
   while True:
-    for event in pygame.event.get():
-      if event.type == pygame.QUIT:
-        pygame.quit()
-        sys.exit()
+    clock.tick(FRAME_RATE)
+    ai.initialize()
+    while True:
+      for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+          pygame.quit()
+          sys.exit()
       if board.state == 0:
-        if event.type == pygame.MOUSEBUTTONDOWN:
-          if event.button == 1:
-            try:
-              xClicked, yClicked = event.pos
-              col = (xClicked - board.startingX) // 32
-              row = (yClicked - board.startingY) // 32
-              board.getCell(col, row).handleLeftClick(board)
-              SCREEN.blit(BG, (0, 0))
-            except IndexError:
-              continue
-          elif event.button == 3:
-            try:
-              xClicked, yClicked = event.pos
-              col = (xClicked - board.startingX) // 32
-              row = (yClicked - board.startingY) // 32
-              board.getCell(col, row).handleRightClick(board)
-              SCREEN.blit(BG, (0, 0))
-            except IndexError:
-              continue
-    board.draw_board(SCREEN)
-    pygame.display.update()
-
-  def gameOver(msg):
-    return
-
+        ai.checkNextCell()
+      else:
+        board.draw_board(SCREEN)
+        pygame.display.update()
+        
 main_menu()
 
 pygame.quit()
