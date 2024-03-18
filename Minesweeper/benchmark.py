@@ -24,6 +24,7 @@ for i in range(iterations):
       break
   if board.state == 1:
     easyWins += 1
+  print(i)
 
 print("easy benchmark done")
 
@@ -47,7 +48,7 @@ print("medium benchmark done")
 
 # Benchmarks for expert
 for i in range(iterations):
-  board = Board(30, 16, 20)
+  board = Board(30, 24, 20)
   ai = Solver(board, None, None)
   ai.sleepMode = False
 
