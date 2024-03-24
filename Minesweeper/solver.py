@@ -10,7 +10,7 @@ def update_display(board, screen, pygame):
   while board.state == 0:
     board.draw_board(screen)
     pygame.display.update()
-    time.sleep(0.1)
+    time.sleep(0.01)
 
 class Solver:
   def __init__(self, board, screen, pygame):
@@ -93,7 +93,7 @@ class Solver:
         cell.handleLeftClick(self.board)
         self.addNewKnowledge(cell)
         if self.sleepMode:
-          time.sleep(0.1)
+          time.sleep(0.01)
         else:
           pass
     else:
@@ -108,7 +108,7 @@ class Solver:
       if not cell.flagged:
         cell.handleRightClick(self.board)
       if self.sleepMode:
-        time.sleep(0.1)
+        time.sleep(0.01)
       #time.sleep(0.01)
 
   # calulates available probabilities if no zeroes, if there are still none make the most likely to succeed move
@@ -209,23 +209,6 @@ class Solver:
           unopened.append(adj_cell)
     return unopened
   
-  def BreakdownEdgeUnopened(self):
-    unopened = self.getEdgeUnopened()
-    strips = set()
-    strip = []
-
-    for cell in unopened:
-      if len(strip) < 5:
-        adj_cells = self.board.getAdjacentCells(cell)
-        adj_unopened = [adj_cell for adj_cell in adj_cells if not adj_cell.clicked and not adj_cell.flagged]
-        strip.extend(adj_unopened)
-      else:
-        strips.add(tuple(strip))  # Convert the list to a tuple and add it to the set
-        strip = []
-    if strip:  # Add the last strip if it has less than 5 cells
-      strips.add(tuple(strip))
-    return strips
-  
   def is_configuration_valid(self, configuration):
     for cell in self.edgeCells:
         if not cell.clicked:  # Skip if the cell is not revealed
@@ -250,26 +233,32 @@ class Solver:
       if num_configurations > 0:
         self.probabilities[cell.location[0]][cell.location[1]] = flagged_configurations / num_configurations * 100
       else:
-        self.probabilities[cell.location[0]][cell.location[1]] = 0
+        self.probabilities[cell.location[0]][cell.location[1]] = 100
 
   def make_decision_based_on_probabilities(self):
     self.calculateEdgeProbabilities()
-    edgeUnopened = self.getEdgeUnopened()
+    unopened_edge_cells = self.getEdgeUnopened()
     min_probability = float('inf')
     min_cell = None
-    for cell in edgeUnopened:
+    for cell in unopened_edge_cells:
       if not cell.clicked and not cell.flagged and self.probabilities[cell.location[0]][cell.location[1]] < min_probability:
         min_probability = self.probabilities[cell.location[0]][cell.location[1]]
         min_cell = cell
     if min_cell is not None:
-      print('clicking random')
-      self.zeroQueue.append(self.board.getCell(min_cell.location[0], min_cell.location[1]))
+      # Introduce a randomness factor to implement exploration
+      if random.random() < 0.05:  # 5% chance to explore
+        if unopened_edge_cells:
+          min_cell = random.choice(unopened_edge_cells)
+      self.zeroQueue.append(min_cell)
     else:
-      if edgeUnopened:
-        random_cell = random.choice(edgeUnopened)
-        self.zeroQueue.append(self.board.getCell(random_cell.location[0], random_cell.location[1]))
+      # All cells have been clicked or flagged, make a random guess
+      unopened_edge_cells = self.getEdgeUnopened()
+      if unopened_edge_cells:
+        random_cell = random.choice(unopened_edge_cells)
+        self.zeroQueue.append(min_cell)
       else:
-        return
+        if self.board.elapsedTime < 15:
+          self.board.state = -1 # Critical failure, this shouldnt happen but take the L when it does
 
   def are_cells_connected(self, cells):
     for cell in cells:
@@ -278,14 +267,24 @@ class Solver:
         return False
     return True
 
+  def dfs(self, cell, visited, strip):
+    visited.add(cell)
+    strip.append(cell)
+    for adj_cell in self.board.getAdjacentCells(cell):
+      if adj_cell in self.getEdgeUnopened() and adj_cell not in visited:
+        self.dfs(adj_cell, visited, strip)
+
   def calculate_all_configurations(self):
     unopened_edge_cells = self.getEdgeUnopened()
     self.all_configurations = []
-    # Create overlapping chunks of connected unopened edge cells with a maximum length of 6
-    for i in range(0, len(unopened_edge_cells) - 9):
-      chunk = unopened_edge_cells[i:i + 10]
-      if self.are_cells_connected(chunk):
-        self.explore_mine_configurations(chunk, 0, set())
+    visited = set()
+    memo = {}  # Initialize memo dictionary
+    for cell in unopened_edge_cells:
+      if cell not in visited:
+        strip = []
+        self.dfs(cell, visited, strip)
+        if len(strip) > 0:
+          self.explore_mine_configurations(strip, self.board.remainingMines, set(), memo)  # Pass memo to function
 
   def is_partial_configuration_valid(self, configuration):
     for row in self.board.cells:
@@ -296,29 +295,47 @@ class Solver:
             return False
     return True
 
-  def explore_mine_configurations(self, border_tiles, depth, current_configuration):
+  def explore_mine_configurations(self, border_tiles, depth, current_configuration, memo):
+    # Convert set to frozenset before using it as a key
+    current_configuration_key = frozenset(current_configuration)
+
     # Base case: Check if current configuration is valid
+    if current_configuration_key in memo:
+      return memo[current_configuration_key]
     if self.is_configuration_valid(current_configuration):
       self.all_configurations.append(current_configuration.copy())
-      return
+      self.last_valid_configuration = current_configuration.copy()
+      memo[current_configuration_key] = True
+      return True
 
     # Pruning: If the current configuration is not valid, stop the recursion
     if not self.is_partial_configuration_valid(current_configuration):
-      return
+      memo[current_configuration_key] = False
+      return False
+
+    # Pruning: If the number of mines left to place is less than the number of cells left to process, stop the recursion
+    if self.board.remainingMines < len(border_tiles) - depth:
+      memo[current_configuration_key] = False
+      return False
 
     # Recursive case: Explore further if not all border tiles have been processed
     if depth < len(border_tiles):
       cell = border_tiles[depth]
-      # Check if the cell is connected to any cell in the current configuration
-      if any(adj_cell in current_configuration for adj_cell in self.board.getAdjacentCells(cell)):
-        # Assume the current cell is a mine and explore
-        current_configuration.add(cell)
-        self.explore_mine_configurations(border_tiles, depth + 1, current_configuration)
-        # Only remove the cell if it's in the set
-        if cell in current_configuration:
-          current_configuration.remove(cell)
+      # Assume the current cell is a mine and explore
+      current_configuration.add(cell)
+      if self.explore_mine_configurations(border_tiles, depth + 1, current_configuration, memo):
+        memo[current_configuration_key] = True
+        return True
+      # Only remove the cell if it's in the set
+      if cell in current_configuration:
+        current_configuration.remove(cell)
       # Assume the current cell is not a mine and explore
-      self.explore_mine_configurations(border_tiles, depth + 1, current_configuration)
+      if self.explore_mine_configurations(border_tiles, depth + 1, current_configuration, memo):
+        memo[current_configuration_key] = True
+        return True
+
+    memo[current_configuration_key] = False
+    return False
 
 
   # deperecated funcitons
