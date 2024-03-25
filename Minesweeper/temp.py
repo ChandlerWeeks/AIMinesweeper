@@ -231,7 +231,7 @@ class Solver:
         if cell in configuration:
           flagged_configurations += 1
       if num_configurations > 0:
-        self.probabilities[cell.location[0]][cell.location[1]] = (flagged_configurations / num_configurations) * 100
+        self.probabilities[cell.location[0]][cell.location[1]] = flagged_configurations / num_configurations * 100
       else:
         self.probabilities[cell.location[0]][cell.location[1]] = 100
 
@@ -291,7 +291,7 @@ class Solver:
       for cell in row:
         if cell.clicked:  # The cell is clicked
           mines = len([adj_cell for adj_cell in self.board.getAdjacentCells(cell) if adj_cell in configuration])
-          if mines != cell.value:  # The number of mines is greater than the cell's value
+          if mines > cell.value:  # The number of mines is greater than the cell's value
             return False
     return True
 
@@ -300,34 +300,44 @@ class Solver:
     current_configuration_key = frozenset(current_configuration)
 
     # Base case: Check if current configuration is valid
-    if depth == 0:
-      if self.is_partial_configuration_valid(current_configuration):
-        self.all_configurations.append(current_configuration.copy())
-      return
+    if current_configuration_key in memo:
+      return memo[current_configuration_key]
+    if self.is_configuration_valid(current_configuration):
+      self.all_configurations.append(current_configuration.copy())
+      self.last_valid_configuration = current_configuration.copy()
+      memo[current_configuration_key] = True
+      return True
 
-    # Pruning: If the number of mines left to place is greater than the number of tiles left to explore, return
-    if depth < self.board.remainingMines:
-      return
+    # Pruning: If the current configuration is not valid, stop the recursion
+    if not self.is_partial_configuration_valid(current_configuration):
+      memo[current_configuration_key] = False
+      return False
 
-    # If we've already explored this configuration, return
-    if (current_configuration_key, depth) in memo:
-      return
+    # Pruning: If the number of mines left to place is less than the number of cells left to process, stop the recursion
+    if self.board.remainingMines < len(border_tiles) - depth:
+      memo[current_configuration_key] = False
+      return False
 
-    # Recursive case: Explore all possible configurations
-    for i in range(len(border_tiles)):
-      tile = border_tiles[i]
-      current_configuration.add(tile)
+    # Recursive case: Explore further if not all border tiles have been processed
+    if depth < len(border_tiles):
+      cell = border_tiles[depth]
+      # Assume the current cell is a mine and explore
+      current_configuration.add(cell)
+      if self.explore_mine_configurations(border_tiles, depth + 1, current_configuration, memo):
+        memo[current_configuration_key] = True
+        return True
+      # Only remove the cell if it's in the set
+      if cell in current_configuration:
+        current_configuration.remove(cell)
+      # Assume the current cell is not a mine and explore
+      if self.explore_mine_configurations(border_tiles, depth + 1, current_configuration, memo):
+        memo[current_configuration_key] = True
+        return True
 
-      # Check for contradictions earlier
-      if not self.is_partial_configuration_valid(current_configuration):
-        current_configuration.remove(tile)
-        continue
+    memo[current_configuration_key] = False
+    return False
 
-      self.explore_mine_configurations(border_tiles[i+1:], depth-1, current_configuration, memo)
-      current_configuration.remove(tile)
 
-    # Mark this configuration as explored
-    memo[(current_configuration_key, depth)] = True
   # deperecated funcitons
   """
   # after making the first guess, start getting cells

@@ -12,7 +12,7 @@ print('starting easy benchmarks')
 
 # Benchmarks for easy
 for i in range(iterations):
-  board = Board(8, 8, 10)
+  board = Board(9, 9, 10)
   ai = Solver(board, None, None)
   ai.sleepMode = False
 
@@ -31,7 +31,7 @@ print("easy benchmark done")
 
 # Benchmarks for beginner
 for i in range(iterations):
-  board = Board(16, 16, 15)
+  board = Board(16, 16, 14)
   ai = Solver(board, None, None)
   ai.sleepMode = False
 
@@ -49,7 +49,7 @@ print("medium benchmark done")
 
 # Benchmarks for expert
 for i in range(iterations):
-  board = Board(30, 16, 20.6)
+  board = Board(16, 30, 18)
   ai = Solver(board, None, None)
   ai.sleepMode = False
 
